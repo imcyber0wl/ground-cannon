@@ -1,5 +1,5 @@
 ###################### >>>>>>>>>>> Written by imcyber0wl on github
-###################### Ground Cannon Dos
+###################### Ground Cannon Dos. Py 3.10.7
 import tkinter as tk
 from tkinter import ttk
 import tkinter.font as font
